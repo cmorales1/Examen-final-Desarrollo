@@ -1,0 +1,349 @@
+openapi: 3.0.3
+info:
+  title: API Componente B - Proveedores y Facturas
+  version: 1.0.0
+  description: |
+    Servicio REST para gestión de proveedores y facturas de la plataforma logística.
+    Persistencia en PostgreSQL. Este componente utiliza también el Componente C para
+    el cálculo de totales y la generación de códigos únicos, además de integrarse
+    con el Componente A mediante llamadas REST.
+
+servers:
+  - url: http://localhost:8082
+    description: Entorno local de desarrollo
+
+paths:
+  /api/proveedores:
+    get:
+      summary: Listar proveedores
+      description: Obtiene la lista completa de proveedores registrados.
+      tags: [Proveedores]
+      responses:
+        '200':
+          description: Lista de proveedores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Proveedor'
+    post:
+      summary: Registrar un nuevo proveedor
+      description: Crea un nuevo proveedor en el sistema.
+      tags: [Proveedores]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProveedorRequest'
+            example:
+              nombre: "Proveedor Demo"
+              email: "proveedor.demo@empresa.com"
+              telefono: "5555-1000"
+      responses:
+        '201':
+          description: Proveedor creado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proveedor'
+        '400':
+          description: Datos inválidos en la petición
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/proveedores/{id}:
+    get:
+      summary: Obtener un proveedor por ID
+      description: Busca un proveedor específico según su identificador numérico.
+      tags: [Proveedores]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: Identificador del proveedor
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Proveedor encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proveedor'
+        '404':
+          description: Proveedor no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/facturas:
+    get:
+      summary: Listar facturas
+      description: Obtiene todas las facturas registradas en el sistema.
+      tags: [Facturas]
+      responses:
+        '200':
+          description: Lista de facturas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Factura'
+    post:
+      summary: Registrar una nueva factura
+      description: |
+        Crea una factura asociada a un proveedor existente. El total se calcula
+        automáticamente utilizando la librería común del Componente C a partir
+        de la lista de productos enviada.
+      tags: [Facturas]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacturaRequest'
+            example:
+              proveedorId: 1
+              productos:
+                - codigo: "F-001"
+                  nombre: "Servicio de transporte"
+                  cantidad: 2
+                  precioUnitario: 100.0
+                - codigo: "F-002"
+                  nombre: "Seguro de carga"
+                  cantidad: 1
+                  precioUnitario: 50.0
+      responses:
+        '201':
+          description: Factura creada correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Factura'
+        '400':
+          description: Datos inválidos o proveedor inexistente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/facturas/proveedor/{proveedorId}:
+    get:
+      summary: Listar facturas por proveedor
+      description: Devuelve todas las facturas asociadas a un proveedor específico.
+      tags: [Facturas]
+      parameters:
+        - in: path
+          name: proveedorId
+          required: true
+          description: Identificador del proveedor
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Lista de facturas del proveedor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Factura'
+        '404':
+          description: Proveedor no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/integracion/ping:
+    get:
+      summary: Ping local del Componente B
+      description: Endpoint de prueba utilizado por el Componente C para verificar conectividad.
+      tags: [Integración]
+      responses:
+        '200':
+          description: Respuesta de ping
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+
+  /api/integracion/probar-remoto:
+    get:
+      summary: Probar integración remota vía librería común
+      description: |
+        Invoca el endpoint `/api/integracion/ping` de otro componente (por ejemplo,
+        el Componente A) utilizando la clase `IntegracionRemota` del Componente C.
+      tags: [Integración]
+      parameters:
+        - in: query
+          name: urlBase
+          required: true
+          description: URL base del componente remoto (ejemplo: `http://localhost:8081`)
+          schema:
+            type: string
+            format: uri
+      responses:
+        '200':
+          description: Respuesta del componente remoto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+        '400':
+          description: Error al invocar el componente remoto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    Proveedor:
+      type: object
+      description: Representa un proveedor que emite facturas.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        nombre:
+          type: string
+          example: "Proveedor Demo"
+        email:
+          type: string
+          format: email
+          example: "proveedor.demo@empresa.com"
+        telefono:
+          type: string
+          example: "5555-1000"
+      required:
+        - id
+        - nombre
+
+    ProveedorRequest:
+      type: object
+      description: Datos requeridos para registrar un nuevo proveedor.
+      properties:
+        nombre:
+          type: string
+          example: "Proveedor Demo"
+        email:
+          type: string
+          format: email
+          example: "proveedor.demo@empresa.com"
+        telefono:
+          type: string
+          example: "5555-1000"
+      required:
+        - nombre
+
+    ProductoDTO:
+      type: object
+      description: Detalle de un producto incluido en una factura.
+      properties:
+        codigo:
+          type: string
+          example: "F-001"
+        nombre:
+          type: string
+          example: "Servicio de transporte"
+        cantidad:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 2
+        precioUnitario:
+          type: number
+          format: double
+          example: 100.0
+      required:
+        - codigo
+        - nombre
+        - cantidad
+        - precioUnitario
+
+    Factura:
+      type: object
+      description: Factura emitida por un proveedor.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 5
+        codigo:
+          type: string
+          description: Código único generado por la librería común.
+          example: "FAC-20251115025500-XY12ZK89"
+        fechaEmision:
+          type: string
+          format: date-time
+          example: "2025-11-15T02:55:00Z"
+        total:
+          type: number
+          format: double
+          description: Importe total calculado a partir de la lista de productos.
+          example: 1050.0
+        proveedor:
+          $ref: '#/components/schemas/Proveedor'
+      required:
+        - id
+        - codigo
+        - fechaEmision
+        - total
+        - proveedor
+
+    FacturaRequest:
+      type: object
+      description: Datos necesarios para registrar una nueva factura.
+      properties:
+        proveedorId:
+          type: integer
+          format: int64
+          description: Identificador del proveedor existente.
+          example: 1
+        productos:
+          type: array
+          description: Lista de productos o servicios incluidos en la factura.
+          items:
+            $ref: '#/components/schemas/ProductoDTO'
+      required:
+        - proveedorId
+        - productos
+
+    Mensaje:
+      type: object
+      description: Respuesta simple de texto utilizada en endpoints de integración.
+      properties:
+        mensaje:
+          type: string
+          example: "Ping desde Componente B"
+
+    ErrorResponse:
+      type: object
+      description: Formato genérico de error HTTP.
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-11-15T02:58:00Z"
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Datos inválidos en la petición"
+        path:
+          type: string
+          example: "/api/facturas"
