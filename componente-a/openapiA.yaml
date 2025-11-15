@@ -1,0 +1,349 @@
+openapi: 3.0.3
+info:
+  title: API Componente A - Clientes y Pedidos
+  version: 1.0.0
+  description: |
+    Servicio REST para gestión de clientes y pedidos de la plataforma logística.
+    Persistencia en MariaDB. Este componente expone operaciones CRUD básicas y
+    utiliza una librería común (Componente C) para el cálculo de totales y generación
+    de códigos únicos.
+
+servers:
+  - url: http://localhost:8081
+    description: Entorno local de desarrollo
+
+paths:
+  /api/clientes:
+    get:
+      summary: Listar clientes
+      description: Obtiene la lista completa de clientes registrados.
+      tags: [Clientes]
+      responses:
+        '200':
+          description: Lista de clientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cliente'
+    post:
+      summary: Registrar un nuevo cliente
+      description: Crea un nuevo cliente en el sistema.
+      tags: [Clientes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteRequest'
+            example:
+              nombre: "Cliente Demo"
+              email: "cliente.demo@empresa.com"
+              telefono: "5555-0000"
+      responses:
+        '201':
+          description: Cliente creado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '400':
+          description: Datos inválidos en la petición
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/clientes/{id}:
+    get:
+      summary: Obtener un cliente por ID
+      description: Busca un cliente específico según su identificador numérico.
+      tags: [Clientes]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: Identificador del cliente
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Cliente encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '404':
+          description: Cliente no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/pedidos:
+    get:
+      summary: Listar pedidos
+      description: Obtiene todos los pedidos registrados en el sistema.
+      tags: [Pedidos]
+      responses:
+        '200':
+          description: Lista de pedidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pedido'
+    post:
+      summary: Registrar un nuevo pedido
+      description: |
+        Crea un nuevo pedido asociado a un cliente existente. El total del pedido
+        se calcula automáticamente utilizando la librería común del Componente C
+        a partir de la lista de productos enviada.
+      tags: [Pedidos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoRequest'
+            example:
+              clienteId: 1
+              productos:
+                - codigo: "P-001"
+                  nombre: "Caja pequeña"
+                  cantidad: 2
+                  precioUnitario: 10.0
+                - codigo: "P-002"
+                  nombre: "Caja grande"
+                  cantidad: 1
+                  precioUnitario: 5.0
+      responses:
+        '201':
+          description: Pedido creado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+        '400':
+          description: Datos inválidos o cliente inexistente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/pedidos/cliente/{clienteId}:
+    get:
+      summary: Listar pedidos por cliente
+      description: Devuelve todos los pedidos asociados a un cliente específico.
+      tags: [Pedidos]
+      parameters:
+        - in: path
+          name: clienteId
+          required: true
+          description: Identificador del cliente
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Lista de pedidos del cliente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pedido'
+        '404':
+          description: Cliente no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/integracion/ping:
+    get:
+      summary: Ping local del Componente A
+      description: Endpoint de prueba utilizado por el Componente C para verificar conectividad.
+      tags: [Integración]
+      responses:
+        '200':
+          description: Respuesta de ping
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+
+  /api/integracion/probar-remoto:
+    get:
+      summary: Probar integración remota vía librería común
+      description: |
+        Invoca el endpoint `/api/integracion/ping` de otro componente (por ejemplo,
+        el Componente B) utilizando la clase `IntegracionRemota` del Componente C.
+      tags: [Integración]
+      parameters:
+        - in: query
+          name: urlBase
+          required: true
+          description: URL base del componente remoto (ejemplo: `http://localhost:8082`)
+          schema:
+            type: string
+            format: uri
+      responses:
+        '200':
+          description: Respuesta del componente remoto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+        '400':
+          description: Error al invocar el componente remoto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    Cliente:
+      type: object
+      description: Representa un cliente que realiza pedidos.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        nombre:
+          type: string
+          example: "Cliente Demo"
+        email:
+          type: string
+          format: email
+          example: "cliente.demo@empresa.com"
+        telefono:
+          type: string
+          example: "5555-0000"
+      required:
+        - id
+        - nombre
+
+    ClienteRequest:
+      type: object
+      description: Datos requeridos para registrar un nuevo cliente.
+      properties:
+        nombre:
+          type: string
+          example: "Cliente Demo"
+        email:
+          type: string
+          format: email
+          example: "cliente.demo@empresa.com"
+        telefono:
+          type: string
+          example: "5555-0000"
+      required:
+        - nombre
+
+    ProductoDTO:
+      type: object
+      description: Detalle de un producto incluido en un pedido.
+      properties:
+        codigo:
+          type: string
+          example: "P-001"
+        nombre:
+          type: string
+          example: "Caja pequeña"
+        cantidad:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 2
+        precioUnitario:
+          type: number
+          format: double
+          example: 10.0
+      required:
+        - codigo
+        - nombre
+        - cantidad
+        - precioUnitario
+
+    Pedido:
+      type: object
+      description: Pedido registrado en el sistema, asociado a un cliente.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 10
+        codigo:
+          type: string
+          description: Código único generado por la librería común.
+          example: "PED-20251115024500-AB12CD34"
+        fechaCreacion:
+          type: string
+          format: date-time
+          example: "2025-11-15T02:45:00Z"
+        total:
+          type: number
+          format: double
+          description: Importe total calculado a partir de la lista de productos.
+          example: 220.0
+        cliente:
+          $ref: '#/components/schemas/Cliente'
+      required:
+        - id
+        - codigo
+        - fechaCreacion
+        - total
+        - cliente
+
+    PedidoRequest:
+      type: object
+      description: Datos necesarios para registrar un nuevo pedido.
+      properties:
+        clienteId:
+          type: integer
+          format: int64
+          description: Identificador del cliente existente.
+          example: 1
+        productos:
+          type: array
+          description: Lista de productos a facturar en el pedido.
+          items:
+            $ref: '#/components/schemas/ProductoDTO'
+      required:
+        - clienteId
+        - productos
+
+    Mensaje:
+      type: object
+      description: Respuesta simple de texto utilizada en endpoints de integración.
+      properties:
+        mensaje:
+          type: string
+          example: "Ping desde Componente A"
+
+    ErrorResponse:
+      type: object
+      description: Formato genérico de error HTTP.
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-11-15T02:50:00Z"
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Datos inválidos en la petición"
+        path:
+          type: string
+          example: "/api/pedidos"
