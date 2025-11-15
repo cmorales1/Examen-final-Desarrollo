@@ -1,0 +1,4 @@
+com\logistica\common\util\CodigoGenerator.class
+com\logistica\common\model\Producto.class
+com\logistica\common\util\CalculadoraFinanciera.class
+com\logistica\common\integracion\IntegracionRemota.class
